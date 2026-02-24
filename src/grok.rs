@@ -4,12 +4,16 @@
 
 use crate::prompt::search_prompt;
 use chrono::{DateTime, Utc};
+use rmcp::{
+    Peer, RoleServer,
+    model::{ProgressNotificationParam, ProgressToken},
+};
 use reqwest::{header::RETRY_AFTER, StatusCode};
 use serde_json::json;
 use std::env;
 use std::error::Error;
 use std::time::Duration;
-use tokio::time::sleep;
+use tokio::time::{Instant, sleep};
 
 type GrokResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
@@ -50,6 +54,7 @@ pub struct GrokClient {
 
 impl GrokClient {
     const MAX_RETRIES: u32 = 3;
+    const PROGRESS_NOTIFY_INTERVAL: Duration = Duration::from_secs(5);
 
     pub fn new(config: GrokConfig) -> Self {
         let fast_http_client = reqwest::Client::builder()
@@ -69,68 +74,38 @@ impl GrokClient {
     }
 
     pub async fn fast_search(&self, query: &str, platform: Option<&str>) -> GrokResult<String> {
-        #[cfg(not(test))]
-        {
-            self.search(
-                query,
-                platform,
-                &self.config.fast_model,
-                &self.fast_http_client,
-            )
-            .await
-        }
-
-        #[cfg(test)]
-        {
-            self.search_with_model(
-                query,
-                platform,
-                &self.config.fast_model,
-                &self.fast_http_client,
-            )
-            .await
-        }
+        self.search_with_model(
+            query,
+            platform,
+            &self.config.fast_model,
+            &self.fast_http_client,
+            None,
+            None,
+        )
+        .await
     }
 
     pub async fn deep_search(&self, query: &str, platform: Option<&str>) -> GrokResult<String> {
-        #[cfg(not(test))]
-        {
-            self.search(
-                query,
-                platform,
-                &self.config.deep_model,
-                &self.deep_http_client,
-            )
+        self.deep_search_with_progress(query, platform, None, None)
             .await
-        }
-
-        #[cfg(test)]
-        {
-            self.search_with_model(
-                query,
-                platform,
-                &self.config.deep_model,
-                &self.deep_http_client,
-            )
-            .await
-        }
     }
 
-    #[cfg(not(test))]
-    async fn search(
+    pub async fn deep_search_with_progress(
         &self,
         query: &str,
         platform: Option<&str>,
-        model: &str,
-        http_client: &reqwest::Client,
+        progress_peer: Option<Peer<RoleServer>>,
+        progress_token: Option<ProgressToken>,
     ) -> GrokResult<String> {
-        self.search_with_model(query, platform, model, http_client)
-            .await
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn search(&self, query: &str, platform: Option<&str>) -> GrokResult<String> {
-        self.fast_search(query, platform).await
+        self.search_with_model(
+            query,
+            platform,
+            &self.config.deep_model,
+            &self.deep_http_client,
+            progress_peer,
+            progress_token,
+        )
+        .await
     }
 
     async fn search_with_model(
@@ -139,6 +114,8 @@ impl GrokClient {
         platform: Option<&str>,
         model: &str,
         http_client: &reqwest::Client,
+        progress_peer: Option<Peer<RoleServer>>,
+        progress_token: Option<ProgressToken>,
     ) -> GrokResult<String> {
         let endpoint = format!(
             "{}/chat/completions",
@@ -175,7 +152,12 @@ impl GrokClient {
 
             let status = response.status();
             if status.is_success() {
-                return Self::parse_sse_stream(response).await;
+                return Self::parse_sse_stream(
+                    response,
+                    progress_peer.clone(),
+                    progress_token.clone(),
+                )
+                .await;
             }
 
             let headers = response.headers().clone();
@@ -219,24 +201,42 @@ impl GrokClient {
         Some(Duration::from_secs(delay.num_seconds().max(0) as u64))
     }
 
-    async fn parse_sse_stream(mut response: reqwest::Response) -> GrokResult<String> {
+    async fn parse_sse_stream(
+        mut response: reqwest::Response,
+        progress_peer: Option<Peer<RoleServer>>,
+        progress_token: Option<ProgressToken>,
+    ) -> GrokResult<String> {
         let mut content = String::new();
         let mut line_buffer = String::new();
+        let start_time = Instant::now();
+        let mut next_progress_at = start_time + Self::PROGRESS_NOTIFY_INTERVAL;
 
-        while let Some(chunk) = response.chunk().await? {
-            line_buffer.push_str(&String::from_utf8_lossy(&chunk));
+        loop {
+            tokio::select! {
+                chunk = response.chunk() => {
+                    let Some(chunk) = chunk? else {
+                        break;
+                    };
 
-            while let Some(newline_pos) = line_buffer.find('\n') {
-                let mut raw_line: String = line_buffer.drain(..=newline_pos).collect();
-                if raw_line.ends_with('\n') {
-                    raw_line.pop();
+                    line_buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+                    while let Some(newline_pos) = line_buffer.find('\n') {
+                        let mut raw_line: String = line_buffer.drain(..=newline_pos).collect();
+                        if raw_line.ends_with('\n') {
+                            raw_line.pop();
+                        }
+                        if raw_line.ends_with('\r') {
+                            raw_line.pop();
+                        }
+
+                        if Self::handle_sse_line(raw_line.trim(), &mut content) {
+                            return Ok(content);
+                        }
+                    }
                 }
-                if raw_line.ends_with('\r') {
-                    raw_line.pop();
-                }
-
-                if Self::handle_sse_line(raw_line.trim(), &mut content) {
-                    return Ok(content);
+                _ = tokio::time::sleep_until(next_progress_at) => {
+                    Self::send_progress_update(&progress_peer, &progress_token, start_time.elapsed()).await;
+                    next_progress_at = Instant::now() + Self::PROGRESS_NOTIFY_INTERVAL;
                 }
             }
         }
@@ -247,6 +247,40 @@ impl GrokClient {
         }
 
         Ok(content)
+    }
+
+    async fn send_progress_update(
+        progress_peer: &Option<Peer<RoleServer>>,
+        progress_token: &Option<ProgressToken>,
+        elapsed: Duration,
+    ) {
+        let (Some(peer), Some(progress_token)) = (progress_peer.as_ref(), progress_token.as_ref())
+        else {
+            return;
+        };
+
+        let elapsed_secs = elapsed.as_secs();
+        let message = if elapsed_secs >= 30 {
+            format!("Deep analysis in progress... ({elapsed_secs}s elapsed)")
+        } else {
+            format!("Searching... ({elapsed_secs}s elapsed)")
+        };
+
+        if let Err(error) = peer
+            .notify_progress(ProgressNotificationParam {
+                progress_token: progress_token.clone(),
+                progress: elapsed_secs as f64,
+                total: None,
+                message: Some(message),
+            })
+            .await
+        {
+            tracing::warn!(
+                error = %error,
+                elapsed_secs,
+                "发送 MCP 进度通知失败，继续搜索"
+            );
+        }
     }
 
     fn handle_sse_line(line: &str, content: &mut String) -> bool {
