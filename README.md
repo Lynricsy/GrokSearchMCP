@@ -29,6 +29,22 @@
 
 ---
 
+## 快速开始
+
+无需克隆仓库，通过 `npx` 一键启动 MCP 服务器：
+
+```bash
+GROK_API_URL=https://api.x.ai/v1 \
+GROK_API_KEY=your-api-key \
+npx -y grok-search-mcp
+```
+
+服务器将通过 stdio 与 MCP 客户端通信。推荐配合 Claude Desktop 或 Claude Code 使用，参见下方 [MCP 配置示例](#mcp-配置示例)。
+
+> **提示**：首次运行 `npx` 会自动下载对应平台的预编译二进制，无需安装 Rust 工具链。
+
+---
+
 ## 安装
 
 ### 通过 NPM（推荐）
