@@ -29,11 +29,11 @@ jobs:
             artifact: grok-search-mcp-linux-arm64
             cross: true
           - name: darwin-x64
-            os: macos-13
+            os: macos-latest
             target: x86_64-apple-darwin
             artifact: grok-search-mcp-darwin-x64
           - name: darwin-arm64
-            os: macos-14
+            os: macos-latest
             target: aarch64-apple-darwin
             artifact: grok-search-mcp-darwin-arm64
           - name: win32-x64
