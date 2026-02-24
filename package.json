@@ -1,5 +1,5 @@
 {
-  "name": "groks",
+  "name": "grok-search",
   "version": "0.1.0",
   "description": "Lightweight MCP search server powered by Grok API, built with Rust. Single web_search tool with SSE streaming and source extraction.",
   "license": "MIT",
@@ -12,7 +12,7 @@
     "url": "https://github.com/Lynricsy/GrokSearchMCP/issues"
   },
   "bin": {
-    "groks": "scripts/run.js"
+    "grok-search": "scripts/run.js"
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.js"

@@ -17,7 +17,7 @@ child.on("error", (err) => {
   if (err.code === "ENOENT") {
     console.error(
       "grok-search-mcp binary not found.\n" +
-        'Run "npm rebuild groks" or reinstall the package.'
+        'Run "npm rebuild grok-search" or reinstall the package.'
     );
   } else {
     console.error(`Failed to start grok-search-mcp: ${err.message}`);
