@@ -42,7 +42,7 @@ impl GrokSearchServer {
 
     #[tool(
         name = "fast_search",
-        description = "Performs a fast web search based on the given query and returns Grok's answer directly. Best for: simple factual queries, quick lookups, recent news, definitions, straightforward questions. Response time: typically 5-15 seconds."
+        description = "Performs a fast web search based on the given query and returns Grok's answer directly. Supports targeted searching on specific platforms (e.g., Twitter, Reddit). Best for: simple factual queries, quick lookups, recent news, definitions, straightforward questions. Response time: typically 5-15 seconds. Note: For in-depth research or multi-faceted analysis, use deep_search instead."
     )]
     async fn fast_search(
         &self,
@@ -58,7 +58,7 @@ impl GrokSearchServer {
 
     #[tool(
         name = "deep_search",
-        description = "Performs a deep web search based on the given query using Grok's multi-agent cluster for thorough analysis. Best for: complex research questions, multi-faceted topics, comparative analysis, in-depth investigations requiring comprehensive coverage. Note: takes longer (30-120 seconds) but provides more thorough results. Use fast_search for simple queries."
+        description = "Performs a deep web search based on the given query using Grok's multi-agent cluster for thorough analysis. Supports targeted searching on specific platforms (e.g., Twitter, Reddit). Best for: complex research questions, multi-faceted topics, comparative analysis, in-depth investigations requiring comprehensive coverage. Note: takes longer (30-120 seconds) but provides more thorough results. Use fast_search for simple queries."
     )]
     async fn deep_search(
         &self,
