@@ -134,6 +134,7 @@ claude mcp add grok-search -- npx -y grok-search
 | `query` | string | **是** | — | 搜索查询语句 |
 | `platform` | string | 否 | null | 聚焦搜索平台（如 `"twitter"`, `"reddit"`） |
 | `include_sources` | boolean | 否 | `false` | 是否在结果中附带来源列表 |
+| `include_thinking` | boolean | 否 | `false` | 是否保留模型的 `<think>` 思维链块 |
 
 **返回：** Grok 生成的搜索答案文本；若 `include_sources` 为 `true`，则附加来源 URL 列表。
 
@@ -150,6 +151,7 @@ claude mcp add grok-search -- npx -y grok-search
 | `query` | string | **是** | — | 搜索查询语句 |
 | `platform` | string | 否 | null | 聚焦搜索平台（如 `"twitter"`, `"reddit"`） |
 | `include_sources` | boolean | 否 | `false` | 是否在结果中附带来源列表 |
+| `include_thinking` | boolean | 否 | `false` | 是否保留模型的 `<think>` 思维链块 |
 
 **返回：** Grok 生成的搜索答案文本；若 `include_sources` 为 `true`，则附加来源 URL 列表。
 

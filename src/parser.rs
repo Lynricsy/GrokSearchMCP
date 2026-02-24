@@ -15,6 +15,9 @@ static MD_LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\[([^\]]+)\]\((https?://[^)]+)\)").expect("markdown 链接正则必须有效")
 });
 
+static THINKING_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?s)<think>[\s\S]*?</think>").expect("thinking 块正则必须有效"));
+
 static SOURCES_HEADING_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?im)^(?:#{1,6}\s*)?(?:\*\*|__)?\s*(sources?|references?|citations?|信源|参考资料|参考|引用|来源列表|来源)\s*(?:\*\*|__)?(?:\s*[（(][^)\n]*[)）])?\s*[:：]?\s*$",
@@ -55,6 +58,11 @@ pub struct Source {
 pub fn parse_sources(text: &str) -> Vec<Source> {
     let (_, sources) = split_answer_and_sources(text);
     dedup_sources(sources)
+}
+
+/// 剥离 `<think>...</think>` 思维链块
+pub fn strip_thinking(text: &str) -> String {
+    THINKING_RE.replace_all(text, "").trim().to_string()
 }
 
 pub fn strip_sources(text: &str) -> String {
@@ -519,6 +527,39 @@ mod tests {
         assert!(parse_sources("").is_empty());
         assert!(parse_sources("   \n \t").is_empty());
         assert_eq!(strip_sources("   \n \t"), "");
+    }
+
+    #[test]
+    fn test_strip_thinking_basic() {
+        let text = "<think>这是思考过程</think>这是最终答案";
+        assert_eq!(strip_thinking(text), "这是最终答案");
+    }
+
+    #[test]
+    fn test_strip_thinking_multiline() {
+        let text = "<think>\n第一步分析...\n第二步推理...\n</think>\n\n搜索结果如下：\n1. Rust 是系统编程语言";
+        assert_eq!(
+            strip_thinking(text),
+            "搜索结果如下：\n1. Rust 是系统编程语言"
+        );
+    }
+
+    #[test]
+    fn test_strip_thinking_multiple_blocks() {
+        let text = "<think>第一段思考</think>中间内容<think>第二段思考</think>最终答案";
+        assert_eq!(strip_thinking(text), "中间内容最终答案");
+    }
+
+    #[test]
+    fn test_strip_thinking_no_blocks() {
+        let text = "没有思维链的普通回答";
+        assert_eq!(strip_thinking(text), "没有思维链的普通回答");
+    }
+
+    #[test]
+    fn test_strip_thinking_empty() {
+        assert_eq!(strip_thinking(""), "");
+        assert_eq!(strip_thinking("<think></think>"), "");
     }
 
     #[test]

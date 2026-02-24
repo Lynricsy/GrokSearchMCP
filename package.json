@@ -1,6 +1,6 @@
 {
   "name": "grok-search",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Lightweight MCP search server powered by Grok API, built with Rust. Dual fast_search/deep_search tools with SSE streaming, progress notifications and source extraction.",
   "license": "MIT",
   "repository": {

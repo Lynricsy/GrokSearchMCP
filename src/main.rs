@@ -21,6 +21,9 @@ pub struct SearchArgs {
     pub platform: Option<String>,
     #[serde(default)]
     pub include_sources: bool,
+    /// 是否保留模型返回的 `<think>` 思维链块（默认剥离）
+    #[serde(default)]
+    pub include_thinking: bool,
 }
 
 #[derive(Clone)]
@@ -53,7 +56,7 @@ impl GrokSearchServer {
             .fast_search(&params.query, params.platform.as_deref())
             .await;
 
-        Self::handle_search_result(raw_content, params.include_sources)
+        Self::handle_search_result(raw_content, params.include_sources, params.include_thinking)
     }
 
     #[tool(
@@ -79,12 +82,13 @@ impl GrokSearchServer {
             )
             .await;
 
-        Self::handle_search_result(raw_content, params.include_sources)
+        Self::handle_search_result(raw_content, params.include_sources, params.include_thinking)
     }
 
     fn handle_search_result(
         raw_content: Result<String, Box<dyn Error + Send + Sync>>,
         include_sources: bool,
+        include_thinking: bool,
     ) -> Result<CallToolResult, McpError> {
         let raw_content = match raw_content {
             Ok(content) => content,
@@ -93,6 +97,12 @@ impl GrokSearchServer {
                     "Grok API 请求失败: {error}"
                 ))]));
             }
+        };
+
+        let raw_content = if include_thinking {
+            raw_content
+        } else {
+            parser::strip_thinking(&raw_content)
         };
 
         let clean_answer = parser::strip_sources(&raw_content).trim().to_string();
