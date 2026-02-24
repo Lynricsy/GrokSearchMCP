@@ -18,19 +18,24 @@ type GrokResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 pub struct GrokConfig {
     pub api_url: String,
     pub api_key: String,
-    pub model: String,
+    pub fast_model: String,
+    pub deep_model: String,
 }
 
 impl GrokConfig {
     pub fn from_env() -> Self {
         let api_url = env::var("GROK_API_URL").expect("GROK_API_URL 环境变量未设置");
         let api_key = env::var("GROK_API_KEY").expect("GROK_API_KEY 环境变量未设置");
-        let model = env::var("GROK_MODEL").unwrap_or_else(|_| "grok-4-fast".to_string());
+        let fast_model = env::var("GROK_FAST_MODEL")
+            .or_else(|_| env::var("GROK_MODEL"))
+            .unwrap_or_else(|_| "grok-4.1-fast".to_string());
+        let deep_model = env::var("GROK_DEEP_MODEL").unwrap_or_else(|_| "grok-4.20-beta".to_string());
 
         Self {
             api_url,
             api_key,
-            model,
+            fast_model,
+            deep_model,
         }
     }
 }
@@ -39,27 +44,109 @@ impl GrokConfig {
 #[derive(Clone)]
 pub struct GrokClient {
     pub config: GrokConfig,
-    pub http_client: reqwest::Client,
+    pub fast_http_client: reqwest::Client,
+    pub deep_http_client: reqwest::Client,
 }
 
 impl GrokClient {
     const MAX_RETRIES: u32 = 3;
 
     pub fn new(config: GrokConfig) -> Self {
+        let fast_http_client = reqwest::Client::builder()
+            .read_timeout(Duration::from_secs(60))
+            .build()
+            .expect("创建 fast HTTP 客户端失败");
+        let deep_http_client = reqwest::Client::builder()
+            .read_timeout(Duration::from_secs(300))
+            .build()
+            .expect("创建 deep HTTP 客户端失败");
+
         Self {
             config,
-            http_client: reqwest::Client::new(),
+            fast_http_client,
+            deep_http_client,
         }
     }
 
-    pub async fn search(&self, query: &str, platform: Option<&str>) -> GrokResult<String> {
+    pub async fn fast_search(&self, query: &str, platform: Option<&str>) -> GrokResult<String> {
+        #[cfg(not(test))]
+        {
+            self.search(
+                query,
+                platform,
+                &self.config.fast_model,
+                &self.fast_http_client,
+            )
+            .await
+        }
+
+        #[cfg(test)]
+        {
+            self.search_with_model(
+                query,
+                platform,
+                &self.config.fast_model,
+                &self.fast_http_client,
+            )
+            .await
+        }
+    }
+
+    pub async fn deep_search(&self, query: &str, platform: Option<&str>) -> GrokResult<String> {
+        #[cfg(not(test))]
+        {
+            self.search(
+                query,
+                platform,
+                &self.config.deep_model,
+                &self.deep_http_client,
+            )
+            .await
+        }
+
+        #[cfg(test)]
+        {
+            self.search_with_model(
+                query,
+                platform,
+                &self.config.deep_model,
+                &self.deep_http_client,
+            )
+            .await
+        }
+    }
+
+    #[cfg(not(test))]
+    async fn search(
+        &self,
+        query: &str,
+        platform: Option<&str>,
+        model: &str,
+        http_client: &reqwest::Client,
+    ) -> GrokResult<String> {
+        self.search_with_model(query, platform, model, http_client)
+            .await
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn search(&self, query: &str, platform: Option<&str>) -> GrokResult<String> {
+        self.fast_search(query, platform).await
+    }
+
+    async fn search_with_model(
+        &self,
+        query: &str,
+        platform: Option<&str>,
+        model: &str,
+        http_client: &reqwest::Client,
+    ) -> GrokResult<String> {
         let endpoint = format!(
             "{}/chat/completions",
             self.config.api_url.trim_end_matches('/')
         );
         let system_prompt = search_prompt(query, platform);
         let payload = json!({
-            "model": self.config.model,
+            "model": model,
             "messages": [
                 {
                     "role": "system",
@@ -78,8 +165,7 @@ impl GrokClient {
         let mut backoff_secs = 1_u64;
 
         loop {
-            let response = self
-                .http_client
+            let response = http_client
                 .post(&endpoint)
                 .bearer_auth(&self.config.api_key)
                 .header("Content-Type", "application/json")
@@ -252,16 +338,22 @@ mod tests {
         let original_url = env::var("GROK_API_URL").ok();
         let original_key = env::var("GROK_API_KEY").ok();
         let original_model = env::var("GROK_MODEL").ok();
+        let original_fast_model = env::var("GROK_FAST_MODEL").ok();
+        let original_deep_model = env::var("GROK_DEEP_MODEL").ok();
 
         remove_env_var("GROK_API_URL");
         set_env_var("GROK_API_KEY", "test-key");
         remove_env_var("GROK_MODEL");
+        remove_env_var("GROK_FAST_MODEL");
+        remove_env_var("GROK_DEEP_MODEL");
 
         let result = panic::catch_unwind(AssertUnwindSafe(GrokConfig::from_env));
 
         restore_env_var("GROK_API_URL", original_url);
         restore_env_var("GROK_API_KEY", original_key);
         restore_env_var("GROK_MODEL", original_model);
+        restore_env_var("GROK_FAST_MODEL", original_fast_model);
+        restore_env_var("GROK_DEEP_MODEL", original_deep_model);
 
         assert!(result.is_err());
         let message = panic_message(result.expect_err("should panic"));
@@ -274,18 +366,79 @@ mod tests {
         let original_url = env::var("GROK_API_URL").ok();
         let original_key = env::var("GROK_API_KEY").ok();
         let original_model = env::var("GROK_MODEL").ok();
+        let original_fast_model = env::var("GROK_FAST_MODEL").ok();
+        let original_deep_model = env::var("GROK_DEEP_MODEL").ok();
 
         set_env_var("GROK_API_URL", "https://api.x.ai/v1");
         set_env_var("GROK_API_KEY", "test-key");
         remove_env_var("GROK_MODEL");
+        remove_env_var("GROK_FAST_MODEL");
+        remove_env_var("GROK_DEEP_MODEL");
 
         let config = GrokConfig::from_env();
 
         restore_env_var("GROK_API_URL", original_url);
         restore_env_var("GROK_API_KEY", original_key);
         restore_env_var("GROK_MODEL", original_model);
+        restore_env_var("GROK_FAST_MODEL", original_fast_model);
+        restore_env_var("GROK_DEEP_MODEL", original_deep_model);
 
-        assert_eq!(config.model, "grok-4-fast");
+        assert_eq!(config.fast_model, "grok-4.1-fast");
+        assert_eq!(config.deep_model, "grok-4.20-beta");
+    }
+
+    #[test]
+    fn test_from_env_fast_model_fallback_to_grok_model() {
+        let _guard = env_lock().lock().expect("failed to acquire env lock");
+        let original_url = env::var("GROK_API_URL").ok();
+        let original_key = env::var("GROK_API_KEY").ok();
+        let original_model = env::var("GROK_MODEL").ok();
+        let original_fast_model = env::var("GROK_FAST_MODEL").ok();
+        let original_deep_model = env::var("GROK_DEEP_MODEL").ok();
+
+        set_env_var("GROK_API_URL", "https://api.x.ai/v1");
+        set_env_var("GROK_API_KEY", "test-key");
+        set_env_var("GROK_MODEL", "grok-fallback-model");
+        remove_env_var("GROK_FAST_MODEL");
+        remove_env_var("GROK_DEEP_MODEL");
+
+        let config = GrokConfig::from_env();
+
+        restore_env_var("GROK_API_URL", original_url);
+        restore_env_var("GROK_API_KEY", original_key);
+        restore_env_var("GROK_MODEL", original_model);
+        restore_env_var("GROK_FAST_MODEL", original_fast_model);
+        restore_env_var("GROK_DEEP_MODEL", original_deep_model);
+
+        assert_eq!(config.fast_model, "grok-fallback-model");
+        assert_eq!(config.deep_model, "grok-4.20-beta");
+    }
+
+    #[test]
+    fn test_from_env_custom_models() {
+        let _guard = env_lock().lock().expect("failed to acquire env lock");
+        let original_url = env::var("GROK_API_URL").ok();
+        let original_key = env::var("GROK_API_KEY").ok();
+        let original_model = env::var("GROK_MODEL").ok();
+        let original_fast_model = env::var("GROK_FAST_MODEL").ok();
+        let original_deep_model = env::var("GROK_DEEP_MODEL").ok();
+
+        set_env_var("GROK_API_URL", "https://api.x.ai/v1");
+        set_env_var("GROK_API_KEY", "test-key");
+        set_env_var("GROK_MODEL", "legacy-grok-model");
+        set_env_var("GROK_FAST_MODEL", "grok-fast-custom");
+        set_env_var("GROK_DEEP_MODEL", "grok-deep-custom");
+
+        let config = GrokConfig::from_env();
+
+        restore_env_var("GROK_API_URL", original_url);
+        restore_env_var("GROK_API_KEY", original_key);
+        restore_env_var("GROK_MODEL", original_model);
+        restore_env_var("GROK_FAST_MODEL", original_fast_model);
+        restore_env_var("GROK_DEEP_MODEL", original_deep_model);
+
+        assert_eq!(config.fast_model, "grok-fast-custom");
+        assert_eq!(config.deep_model, "grok-deep-custom");
     }
 
     #[test]
