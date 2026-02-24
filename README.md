@@ -4,6 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org/)
+[![npm](https://img.shields.io/npm/v/grok-search-mcp)](https://www.npmjs.com/package/grok-search-mcp)
 
 ---
 
@@ -28,7 +29,21 @@
 
 ---
 
-## 构建
+## 安装
+
+### 通过 NPM（推荐）
+
+```bash
+npm install -g grok-search-mcp
+```
+
+或使用 `npx` 直接运行：
+
+```bash
+npx grok-search-mcp
+```
+
+### 从源码构建
 
 需要 Rust 1.75+，以及系统级 OpenSSL 库（Linux 上通常为 `libssl-dev`）。
 
@@ -49,7 +64,8 @@ cargo build --release
 {
   "mcpServers": {
     "grok-search": {
-      "command": "/path/to/grok-search-mcp",
+      "command": "npx",
+      "args": ["-y", "grok-search-mcp"],
       "env": {
         "GROK_API_URL": "https://api.x.ai/v1",
         "GROK_API_KEY": "your-api-key"
@@ -61,11 +77,18 @@ cargo build --release
 
 ### Claude Code
 
+```bash
+claude mcp add grok-search -- npx -y grok-search-mcp
+```
+
+或手动配置：
+
 ```json
 {
   "mcpServers": {
     "grok-search": {
-      "command": "/path/to/grok-search-mcp",
+      "command": "npx",
+      "args": ["-y", "grok-search-mcp"],
       "env": {
         "GROK_API_URL": "https://api.x.ai/v1",
         "GROK_API_KEY": "your-api-key",

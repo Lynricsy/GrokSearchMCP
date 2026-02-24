@@ -1,0 +1,35 @@
+{
+  "name": "grok-search-mcp",
+  "version": "0.1.0",
+  "description": "Lightweight MCP search server powered by Grok API, built with Rust. Single web_search tool with SSE streaming and source extraction.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lynricsy/GrokSearchMCP.git"
+  },
+  "homepage": "https://github.com/Lynricsy/GrokSearchMCP",
+  "bugs": {
+    "url": "https://github.com/Lynricsy/GrokSearchMCP/issues"
+  },
+  "bin": {
+    "grok-search-mcp": "scripts/run.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "keywords": [
+    "mcp",
+    "grok",
+    "search",
+    "ai",
+    "model-context-protocol",
+    "xai"
+  ],
+  "files": [
+    "scripts/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
