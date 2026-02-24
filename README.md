@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org/)
-[![npm](https://img.shields.io/npm/v/grok-search-mcp)](https://www.npmjs.com/package/grok-search-mcp)
+[![npm](https://img.shields.io/npm/v/groks)](https://www.npmjs.com/package/groks)
 
 ---
 
@@ -36,7 +36,7 @@
 ```bash
 GROK_API_URL=https://api.x.ai/v1 \
 GROK_API_KEY=your-api-key \
-npx -y grok-search-mcp
+npx -y groks
 ```
 
 服务器将通过 stdio 与 MCP 客户端通信。推荐配合 Claude Desktop 或 Claude Code 使用，参见下方 [MCP 配置示例](#mcp-配置示例)。
@@ -50,13 +50,13 @@ npx -y grok-search-mcp
 ### 通过 NPM（推荐）
 
 ```bash
-npm install -g grok-search-mcp
+npm install -g groks
 ```
 
 或使用 `npx` 直接运行：
 
 ```bash
-npx grok-search-mcp
+npx groks
 ```
 
 ### 从源码构建
@@ -81,7 +81,7 @@ cargo build --release
   "mcpServers": {
     "grok-search": {
       "command": "npx",
-      "args": ["-y", "grok-search-mcp"],
+      "args": ["-y", "groks"],
       "env": {
         "GROK_API_URL": "https://api.x.ai/v1",
         "GROK_API_KEY": "your-api-key"
@@ -94,7 +94,7 @@ cargo build --release
 ### Claude Code
 
 ```bash
-claude mcp add grok-search -- npx -y grok-search-mcp
+claude mcp add grok-search -- npx -y groks
 ```
 
 或手动配置：
@@ -104,7 +104,7 @@ claude mcp add grok-search -- npx -y grok-search-mcp
   "mcpServers": {
     "grok-search": {
       "command": "npx",
-      "args": ["-y", "grok-search-mcp"],
+      "args": ["-y", "groks"],
       "env": {
         "GROK_API_URL": "https://api.x.ai/v1",
         "GROK_API_KEY": "your-api-key",
