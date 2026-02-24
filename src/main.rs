@@ -15,6 +15,7 @@ use std::sync::Arc;
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct WebSearchArgs {
     pub query: String,
+    /// 聚焦搜索平台（如 "twitter", "reddit"）
     #[serde(default)]
     pub platform: Option<String>,
     #[serde(default)]

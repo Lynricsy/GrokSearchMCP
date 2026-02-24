@@ -128,7 +128,7 @@ claude mcp add grok-search -- npx -y grok-search-mcp
 | 参数名 | 类型 | 必需 | 默认值 | 说明 |
 |--------|------|------|--------|------|
 | `query` | string | **是** | — | 搜索查询语句 |
-| `platform` | string | 否 | null | 指定搜索平台（如 `"twitter"`, `"reddit"`） |
+| `platform` | string | 否 | null | 聚焦搜索平台（如 `"twitter"`, `"reddit"`） |
 | `include_sources` | boolean | 否 | `false` | 是否在结果中附带来源列表 |
 
 **返回：** Grok 生成的搜索答案文本；若 `include_sources` 为 `true`，则附加来源 URL 列表。
