@@ -5,6 +5,8 @@
 #![allow(dead_code)]
 
 use regex::Regex;
+
+type StrategyFn = fn(&str) -> Option<(String, Vec<Source>)>;
 use serde_json::Value;
 use std::collections::HashSet;
 use std::sync::LazyLock;
@@ -83,7 +85,7 @@ fn split_answer_and_sources(text: &str) -> (String, Vec<Source>) {
         return (String::new(), Vec::new());
     }
 
-    let strategies: [fn(&str) -> Option<(String, Vec<Source>)>; 4] = [
+    let strategies: [StrategyFn; 4] = [
         split_function_call_sources,
         split_heading_sources,
         split_details_block_sources,
@@ -443,7 +445,7 @@ fn is_http_url(url: &str) -> bool {
 }
 
 fn trim_url_tail_punctuation(url: &str) -> &str {
-    url.trim_end_matches(|c| matches!(c, '.' | ',' | ';' | ':' | '!' | '?'))
+    url.trim_end_matches(['.', ',', ';', ':', '!', '?'])
 }
 
 #[cfg(test)]
